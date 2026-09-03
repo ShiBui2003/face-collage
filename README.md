@@ -6,6 +6,8 @@ appears, picks the best representative frame per person, and builds a shareable 
 
 No backend. No network calls at runtime. Everything runs on the device.
 
+**[Demo video](screen_recording.mp4)** — 47.5s, end-to-end flow on all three sample clips.
+
 ---
 
 ## Build and setup
