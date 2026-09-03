@@ -9,6 +9,7 @@ import com.iykyk.facecollage.data.DetectedFace
 import com.iykyk.facecollage.data.PersonIdentity
 import com.iykyk.facecollage.data.PersonResult
 import com.iykyk.facecollage.data.ProcessingState
+import com.iykyk.facecollage.data.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -30,17 +31,43 @@ class VideoPipeline(
     private val clusterer = IdentityClusterer(config)
     private val scorer = RepresentativeFrameScorer(config)
 
+    /** Everything up to and including tracking. The expensive half: decode, detect, embed. */
+    data class TrackedVideo(
+        val tracks: List<Track>,
+        val durationMs: Long,
+        val framesAnalysed: Int,
+        val facesDetected: Int,
+    )
+
+    /**
+     * Stages 1 to 3 only: sample frames, detect and embed faces, stitch them into tracks.
+     *
+     * Separated from [run] so a tuning harness can re-cluster the same tracks at many
+     * thresholds without paying for detection and embedding each time.
+     */
+    suspend fun buildTracks(
+        uri: Uri,
+        onProgress: (ProcessingState.Working) -> Unit = {},
+    ): TrackedVideo = withContext(Dispatchers.Default) {
+        val durationMs = extractor.durationMs(context, uri)
+        require(durationMs > 0) { "That video could not be read." }
+
+        val frames = detectAndEmbed(uri, durationMs, onProgress)
+        TrackedVideo(
+            tracks = tracker.buildTracks(frames),
+            durationMs = durationMs,
+            framesAnalysed = frames.size,
+            facesDetected = frames.sumOf { it.size },
+        )
+    }
+
     suspend fun run(uri: Uri, onProgress: (ProcessingState.Working) -> Unit): CollageResult =
         withContext(Dispatchers.Default) {
-            val durationMs = extractor.durationMs(context, uri)
-            require(durationMs > 0) { "That video could not be read." }
-
-            val frames = detectAndEmbed(uri, durationMs, onProgress)
-            val facesDetected = frames.sumOf { it.size }
+            val tracked = buildTracks(uri, onProgress)
 
             onProgress(working(ProcessingState.Stage.CLUSTERING, "Working out who is who", null))
             coroutineContext.ensureActive()
-            val identities = clusterer.cluster(tracker.buildTracks(frames))
+            val identities = clusterer.cluster(tracked.tracks)
 
             onProgress(working(ProcessingState.Stage.SCORING, "Picking everyone's best shot", null))
             val people = identities.map { identity ->
@@ -56,9 +83,9 @@ class VideoPipeline(
             CollageResult(
                 people = people,
                 collage = null,
-                videoDurationMs = durationMs,
-                framesAnalysed = frames.size,
-                facesDetected = facesDetected,
+                videoDurationMs = tracked.durationMs,
+                framesAnalysed = tracked.framesAnalysed,
+                facesDetected = tracked.facesDetected,
             )
         }
 

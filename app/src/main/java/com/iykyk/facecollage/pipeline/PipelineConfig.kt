@@ -48,8 +48,16 @@ data class PipelineConfig(
     val minVisibleSegmentMs: Long = 500L,
 
     // ---- identity clustering (whole video) ----
-    /** Merge two track clusters while their average cosine similarity is at least this. */
-    val identityMergeThreshold: Float = 0.62f,
+    /**
+     * Merge two track clusters while their average cosine similarity is at least this.
+     *
+     * Chosen from a sweep over all three clips, not from whichever value scored best on the
+     * one clip with a known answer. Below ~0.46 samples 2 and 3 over-merge (distinct people
+     * collapse into one 7- or 8-appearance blob); above ~0.54 sample 1 fragments into extra
+     * singleton identities. 0.48-0.52 is the only band where all three are simultaneously
+     * stable, so this sits in the middle of it.
+     */
+    val identityMergeThreshold: Float = 0.50f,
     /** A track is represented by the mean of its best-quality detections, not all of them. */
     val trackEmbeddingTopK: Int = 5,
     /**
