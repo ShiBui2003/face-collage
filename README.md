@@ -8,7 +8,7 @@ No backend. No network calls at runtime. Everything runs on the device.
 
 ![Demo](demo.gif)
 
-47.5s end-to-end flow on all three sample clips ([full-quality video](screen_recording.mp4)).
+38.5s end-to-end flow on all three sample clips ([full-quality video](screen_recording.mp4)).
 
 ---
 
