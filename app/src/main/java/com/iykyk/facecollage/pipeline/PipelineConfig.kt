@@ -1,5 +1,8 @@
 package com.iykyk.facecollage.pipeline
 
+import kotlin.math.ceil
+import kotlin.math.max
+
 /**
  * Every tunable in the pipeline, in one place.
  *
@@ -37,16 +40,23 @@ data class PipelineConfig(
     val maxCenterMovePerFrame: Float = 1.2f,
     /** A track survives this many consecutive sampled frames with no match before it closes. */
     val maxGapFrames: Int = 3,
-    /** Tracks shorter than this are flicker, not an appearance. */
-    val minTrackDetections: Int = 2,
+    /**
+     * The brief counts an appearance as a continuous VISIBLE segment. A face flashing up for
+     * two or three sampled frames at a scene cut is not that, so segments shorter than this
+     * are discarded rather than counted.
+     */
+    val minVisibleSegmentMs: Long = 500L,
 
     // ---- identity clustering (whole video) ----
     /** Merge two track clusters while their average cosine similarity is at least this. */
     val identityMergeThreshold: Float = 0.62f,
     /** A track is represented by the mean of its best-quality detections, not all of them. */
     val trackEmbeddingTopK: Int = 5,
-    /** Two segments of one person closer than this are one appearance, not two. */
-    val appearanceCoalesceGapMs: Long = 500L,
+    /**
+     * Two segments of one person closer than this are one appearance that briefly broke up,
+     * not two. MUST stay below [trackBreakGapMs]; see the init block.
+     */
+    val appearanceCoalesceGapMs: Long = 250L,
 
     // ---- representative frame scoring ----
     val weightFrontality: Float = 0.35f,
@@ -66,4 +76,26 @@ data class PipelineConfig(
     // ---- collage ----
     /** Face box is expanded by this factor for the tile crop. Never crop tight to the box. */
     val faceCropExpansion: Float = 3.0f,
-)
+) {
+
+    /** How long the tracker tolerates losing a face before it closes the track. */
+    val trackBreakGapMs: Long get() = maxGapFrames * sampleIntervalMs
+
+    /** How many sampled frames a track must span to count as a visible segment. */
+    val minTrackDetections: Int
+        get() = max(2, ceil(minVisibleSegmentMs.toDouble() / sampleIntervalMs).toInt())
+
+    init {
+        // The tracker splits a track when it loses a face for longer than trackBreakGapMs.
+        // If clustering then re-merged segments across a WIDER gap than that, it would
+        // systematically undo the tracker's decision and weld distinct appearances together.
+        // Coalescing must always be the stricter of the two.
+        require(appearanceCoalesceGapMs < trackBreakGapMs) {
+            "appearanceCoalesceGapMs (" + appearanceCoalesceGapMs + "ms) must be strictly less " +
+                "than trackBreakGapMs (" + trackBreakGapMs + "ms), otherwise clustering re-merges " +
+                "segments the tracker deliberately split"
+        }
+        require(sampleIntervalMs > 0) { "sampleIntervalMs must be positive" }
+        require(maxGapFrames >= 1) { "maxGapFrames must be at least 1" }
+    }
+}

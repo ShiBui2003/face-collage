@@ -59,14 +59,37 @@ class IdentityClustererTest {
 
     @Test
     fun `two tracks separated by less than the coalesce gap count as one appearance`() {
-        // one continuous appearance that briefly broke: 0..375ms then resuming at 500ms
+        // one continuous appearance that briefly broke: ends at 375ms, resumes at 500ms (125ms gap)
         val a = track(0, person = 1, startMs = 0, count = 4)
-        val b = track(1, person = 1, startMs = 875, count = 4)
+        val b = track(1, person = 1, startMs = 500, count = 4)
 
         val identity = clusterer.cluster(listOf(a, b)).single()
 
         assertEquals(1, identity.appearanceCount)
         assertEquals(listOf(0, 1), identity.appearances.single().trackIds)
+    }
+
+    @Test
+    fun `two tracks separated by more than the coalesce gap stay separate appearances`() {
+        // A gap wider than the tracker's own break threshold means the person really did leave.
+        // Coalescing these would weld two distinct appearances into one and undercount.
+        val config = PipelineConfig()
+        val a = track(0, person = 1, startMs = 0, count = 4)
+        val b = track(1, person = 1, startMs = a.endMs + config.trackBreakGapMs + 100, count = 4)
+
+        val identity = clusterer.cluster(listOf(a, b)).single()
+
+        assertEquals(2, identity.appearanceCount)
+    }
+
+    @Test
+    fun `a gap just above the coalesce threshold is not merged`() {
+        val config = PipelineConfig()
+        val a = track(0, person = 1, startMs = 0, count = 4)
+        val gap = config.appearanceCoalesceGapMs + SAMPLE_MS
+        val b = track(1, person = 1, startMs = a.endMs + gap, count = 4)
+
+        assertEquals(2, clusterer.cluster(listOf(a, b)).single().appearanceCount)
     }
 
     @Test

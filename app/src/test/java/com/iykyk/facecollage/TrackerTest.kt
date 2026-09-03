@@ -37,16 +37,16 @@ class TrackerTest {
 
     @Test
     fun `a long absence splits one person into two tracks`() {
-        // present 0..3, gone 4..9 (6 frames, well past maxGapFrames), back 10..13
-        val frames = (0 until 14).map { f ->
-            if (f in 4..9) emptyList() else listOf(face(frame = f, person = 1))
+        // present 0..5, gone 6..11 (6 frames, well past maxGapFrames), back 12..17
+        val frames = (0 until 18).map { f ->
+            if (f in 6..11) emptyList() else listOf(face(frame = f, person = 1))
         }
 
         val tracks = tracker.buildTracks(frames)
 
         assertEquals(2, tracks.size)
-        assertEquals(4, tracks[0].detections.size)
-        assertEquals(4, tracks[1].detections.size)
+        assertEquals(6, tracks[0].detections.size)
+        assertEquals(6, tracks[1].detections.size)
     }
 
     @Test
@@ -73,16 +73,18 @@ class TrackerTest {
 
     @Test
     fun `two different people at the same position never merge into one track`() {
-        // person 1 occupies the spot for 3 frames, then person 2 takes exactly the same box
+        // person 1 holds the spot, then person 2 takes exactly the same box.
+        // Each run is long enough to clear minTrackDetections, so this tests identity
+        // separation rather than the short-segment filter.
         val box = boxAt(360f, 640f)
-        val frames = (0 until 6).map { f ->
-            listOf(face(frame = f, person = if (f < 3) 1 else 2, box = box))
+        val frames = (0 until 12).map { f ->
+            listOf(face(frame = f, person = if (f < 6) 1 else 2, box = box))
         }
 
         val tracks = tracker.buildTracks(frames)
 
         assertEquals(2, tracks.size)
-        assertTrue(tracks.all { it.detections.size == 3 })
+        assertTrue(tracks.all { it.detections.size == 6 })
     }
 
     @Test
