@@ -20,6 +20,12 @@ data class PipelineConfig(
     val minSharpness: Float = 15f,
     /** Beyond this yaw the embedding is unreliable. */
     val maxUsableYaw: Float = 50f,
+    /**
+     * Two boxes overlapping by more than this are the same face, so only the better one is
+     * kept. Measured on the sample clips: boxes on one face overlap by 0.41-0.49, boxes on
+     * different faces by 0.00-0.11, so anything in 0.2-0.35 separates them cleanly.
+     */
+    val nmsIouThreshold: Float = 0.3f,
 
     // ---- tracking (frame to frame) ----
     val trackEmbeddingWeight: Float = 0.60f,

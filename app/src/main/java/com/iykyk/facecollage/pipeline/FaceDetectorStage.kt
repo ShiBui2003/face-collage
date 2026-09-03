@@ -38,7 +38,8 @@ class FaceDetectorStage(private val config: PipelineConfig = PipelineConfig()) :
      */
     fun detect(bitmap: Bitmap): List<FaceCandidate> {
         val faces = Tasks.await(detector.process(InputImage.fromBitmap(bitmap, 0)))
-        return faces.mapNotNull { face -> toCandidate(face, bitmap) }
+        val candidates = faces.mapNotNull { face -> toCandidate(face, bitmap) }
+        return suppressOverlappingFaces(candidates, bitmap.height, config.nmsIouThreshold)
     }
 
     private fun toCandidate(face: Face, bitmap: Bitmap): FaceCandidate? {
@@ -71,3 +72,32 @@ class FaceDetectorStage(private val config: PipelineConfig = PipelineConfig()) :
 
     override fun close() = detector.close()
 }
+
+/**
+ * Greedy non-maximum suppression over a single frame's detections.
+ *
+ * ML Kit emits several stacked boxes for one face on downscaled frames. Left alone each
+ * duplicate starts its own track and then its own identity, which roughly doubles both the
+ * person count and the appearance count. Keeping only the best box per face is a
+ * correctness fix, not a tuning knob.
+ *
+ * Pure by design so it can be unit tested on the JVM with no emulator.
+ */
+fun suppressOverlappingFaces(
+    candidates: List<FaceCandidate>,
+    frameHeight: Int,
+    iouThreshold: Float,
+): List<FaceCandidate> {
+    if (candidates.size < 2) return candidates
+
+    val kept = ArrayList<FaceCandidate>(candidates.size)
+    for (candidate in candidates.sortedByDescending { it.quality(frameHeight) }) {
+        val overlapsKept = kept.any { it.box.intersectionOverUnion(candidate.box) > iouThreshold }
+        if (!overlapsKept) kept += candidate
+    }
+    return kept
+}
+
+/** Sharpness x frontality x relative size: the crispest, most frontal, largest box wins. */
+private fun FaceCandidate.quality(frameHeight: Int): Float =
+    attributes.sharpness * attributes.frontality * (box.height / frameHeight.toFloat())
