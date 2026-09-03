@@ -142,6 +142,15 @@ slack. Those tolerances record measured accuracy and exist to catch regressions.
 also asserts the appearance-count *distribution*, so a run cannot pass by hitting the totals
 with broken clustering the way a 0.40 merge threshold does.
 
+**These figures are emulator-measured (Pixel 6 Pro AVD, API 34).** Run on a physical device
+(tested: a real Android phone via `adb install`), Sample 1 gave **18** appearances instead of
+19 — same 5 people, but one identity had 2 recorded segments instead of 3, rather than the
+emulator's single merged-segment shortfall. Real hardware's video decoder samples frames at
+the same nominal timestamps slightly differently than the emulator's software decoder, which
+can shift which frames pass the visibility gate. Both runs are within 1-2 of the published 20
+and preserve the correct person count; treat the exact appearance figures above as one
+measured environment, not a hardware-independent constant.
+
 ### Duplicate suppression, measured twice
 
 The first measurement, taken on the busiest frames, showed boxes on one face overlapping by
