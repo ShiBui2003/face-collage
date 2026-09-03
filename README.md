@@ -34,6 +34,14 @@ echo "sdk.dir=/absolute/path/to/Android/Sdk" > local.properties
 ./gradlew connectedDebugAndroidTest
 ```
 
+Step 4 runs every instrumented class, including the one-shot diagnostics above and a
+threshold sweep, on all three sample clips: roughly 25-30 minutes on an emulator. To run
+only the graded accuracy check:
+
+```bash
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.iykyk.facecollage.PipelineGroundTruthTest
+```
+
 ---
 
 ## Face embedding model
@@ -186,6 +194,19 @@ bug that was fixed in Phase 4; coalescing is already stricter than track-breakin
 It is left unfixed deliberately. The only lever is `maxGapFrames`, and lowering it purely to
 correct this one segment on the one clip with a published answer is the kind of change that
 fits a sample rather than improves the pipeline. It is recorded here instead.
+
+## Diagnostics behind the numbers above
+
+These are one-shot measurement tools, not pass/fail tests, kept because their output is
+quoted directly in this README rather than summarised from memory:
+
+| file | produced |
+|---|---|
+| `FrameDumpTest` | the first duplicate-box IoU measurement (0.41-0.49 vs 0.00-0.11) and the annotated split-screen image that ruled out background faces |
+| `DetectionDiagnosticsTest` | the sharpness/relative-height percentiles behind `minSharpness` and `minFaceHeightFraction` |
+| `ClusterGapDiagnosticTest` | the 0.597 cosine similarity showing the Sample 1 residual is a temporal-exclusion case, not a threshold or embedding problem |
+| `ResidualDuplicateIouTest` | the second IoU measurement (0.245-0.290 vs 0.000-0.198) behind `nmsIouThreshold = 0.22` |
+| `ThresholdSweepTest` | the `identityMergeThreshold` sweep table |
 
 ## Other tuned constants
 
