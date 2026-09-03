@@ -110,6 +110,12 @@ class DetectedFace(
     val rawQuality: Float get() = attributes.frontality * attributes.sharpness
 }
 
+/** A face found in a frame, before the embedding model has run on it. */
+data class FaceCandidate(
+    val box: BoxF,
+    val attributes: FaceAttributes,
+)
+
 /** A continuous run of detections believed to be one person, within one pass of the video. */
 data class Track(
     val id: Int,

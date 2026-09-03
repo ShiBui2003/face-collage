@@ -51,6 +51,12 @@ data class PipelineConfig(
     /** Multiplier applied when the face touches the frame edge (clipped). */
     val clippedFacePenalty: Float = 0.5f,
 
+    /**
+     * Margin around the face box fed to the embedding model. Modest on purpose: the model
+     * expects a face-filling crop. This is NOT the collage crop, which is deliberately generous.
+     */
+    val embeddingCropExpansion: Float = 1.25f,
+
     // ---- collage ----
     /** Face box is expanded by this factor for the tile crop. Never crop tight to the box. */
     val faceCropExpansion: Float = 3.0f,

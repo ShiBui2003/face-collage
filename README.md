@@ -51,7 +51,13 @@ echo "sdk.dir=/absolute/path/to/Android/Sdk" > local.properties
 | **Original paper** | [FaceNet: A Unified Embedding for Face Recognition and Clustering](https://arxiv.org/abs/1503.03832) |
 
 The model is loaded with the TensorFlow Lite `Interpreter` behind the `FaceEmbedder`
-interface, so the backend can be swapped without touching the pipeline.
+interface, so the backend can be swapped without touching the pipeline. The input edge and
+embedding dimension are read from the model file at runtime rather than hardcoded, and
+`FaceEmbedderInstrumentedTest` asserts them against the numbers documented above, so this
+table cannot silently drift from the bundled asset.
+
+FaceNet expects per-image standardisation ("prewhitening") rather than a 0..1 scale; the
+embedder implements that, since getting it wrong degrades embeddings subtly rather than visibly.
 
 ### Why FaceNet and not MobileFaceNet
 
