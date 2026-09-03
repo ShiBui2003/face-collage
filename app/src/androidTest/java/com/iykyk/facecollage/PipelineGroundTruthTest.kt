@@ -94,7 +94,7 @@ class PipelineGroundTruthTest {
             assertTrue(
                 "${sample.name}: only $matching identities have the expected $modalExpected " +
                     "appearances, counts were $counts",
-                matching >= expected.identities - PEOPLE_TOLERANCE,
+                matching >= expected.identities - DISTRIBUTION_SLACK,
             )
         }
 
@@ -104,11 +104,18 @@ class PipelineGroundTruthTest {
     private companion object {
         const val TAG = "GroundTruth"
 
-        /** Measured on Sample 1: 6 people found against a known 5. */
-        const val PEOPLE_TOLERANCE = 1
+        /** Measured on Sample 1: exactly 5 people against a known 5, so no slack is allowed. */
+        const val PEOPLE_TOLERANCE = 0
 
-        /** Measured on Sample 1: 21 appearances found against a known 20. */
+        /** Measured on Sample 1: 19 appearances against a known 20; see Known defects in README. */
         const val APPEARANCE_TOLERANCE = 1
+
+        /**
+         * How many identities may miss the expected appearance count. Measured at 1: Sample 1
+         * gives [4,4,4,4,3], the short one being the known scene-cut weld. Kept separate from
+         * PEOPLE_TOLERANCE so tightening the person count does not silently tighten this too.
+         */
+        const val DISTRIBUTION_SLACK = 1
 
         const val MAX_PLAUSIBLE_PEOPLE = 12
         const val MAX_PLAUSIBLE_APPEARANCES = 20

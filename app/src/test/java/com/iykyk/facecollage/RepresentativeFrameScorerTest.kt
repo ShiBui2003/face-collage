@@ -59,6 +59,27 @@ class RepresentativeFrameScorerTest {
         assertSame(large, scorer.pickBest(listOf(small, large)))
     }
 
+    /**
+     * A generous crop around one person in a two-shot drags the other person into the tile, and
+     * the same shared frame can end up representing two different identities. Where a solo frame
+     * exists it wins, even when the shared one scores better on every other attribute.
+     */
+    @Test
+    fun `prefers a solo frame over a better-looking shared one`() {
+        val shared = face(frame = 0, person = 1, sharpness = 220f, eulerY = 0f, facesInFrame = 2)
+        val solo = face(frame = 1, person = 1, sharpness = 120f, eulerY = 10f, facesInFrame = 1)
+
+        assertSame(solo, scorer.pickBest(listOf(shared, solo)))
+    }
+
+    @Test
+    fun `a shared frame is still used when no solo frame exists`() {
+        val worse = face(frame = 0, person = 1, sharpness = 40f, eulerY = 35f, facesInFrame = 2)
+        val better = face(frame = 1, person = 1, sharpness = 200f, eulerY = 3f, facesInFrame = 2)
+
+        assertSame(better, scorer.pickBest(listOf(worse, better)))
+    }
+
     @Test
     fun `a single candidate is returned as-is`() {
         val only = face(frame = 0, person = 1, sharpness = 16f, eulerY = 44f)

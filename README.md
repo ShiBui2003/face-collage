@@ -107,31 +107,91 @@ over-merge independently, at `[8,...]` and `[7,...]`.
 over-merge, above it Sample 1 fragments into singleton identities. 0.50 sits in the middle
 of that band.
 
+The sweep above was measured with `nmsIouThreshold` at 0.30, before residual duplicate
+suppression was tightened to 0.22. The threshold choice it produced was re-verified against
+all three clips afterwards; the final numbers are below.
+
 ### Accuracy achieved
 
-| clip | people found | expected | appearances found | expected |
-|---|---|---|---|---|
-| sample_1 | 6 | 5 | 21 | 20 |
-| sample_2 | 6 | not provided | 21 | not provided |
-| sample_3 | 5 | not provided | 19 | not provided |
+| clip | people found | expected | appearances found | expected | distribution |
+|---|---|---|---|---|---|
+| sample_1 | **5** | 5 | 19 | 20 | `[4,4,4,4,3]` |
+| sample_2 | **5** | not provided | 20 | not provided | `[4,4,4,4,4]` |
+| sample_3 | **5** | not provided | 19 | not provided | `[4,4,4,4,3]` |
 
-Sample 1 is over by one person and one appearance. The generalisation trade-off was taken
-deliberately: a threshold that made Sample 1 read exactly 5 made Samples 2 and 3 obviously
-wrong, so the value that behaves consistently on all three was preferred. Samples 2 and 3
-independently resolve to the same "five people, four appearances each" structure as Sample
-1's known answer, which is the strongest available evidence the pipeline generalises rather
-than fits.
+Sample 1 matches the published person count exactly and is short by one appearance, for the
+reason recorded under Known defects. Samples 2 and 3 have no published answer, yet both
+resolve independently to the same "five people, four appearances each" structure, and
+Sample 2 lands on exactly 20 appearances. Three clips converging on the same shape, when
+only one of them could be checked, is the strongest available evidence the pipeline
+generalises rather than fits the one clip with a known answer.
 
-`PipelineGroundTruthTest` asserts this with tolerances of plus or minus one person and one
-appearance. Those tolerances record measured accuracy, exist to catch regressions, and are
-meant to be tightened. The test also asserts the appearance-count *distribution*, so a run
-cannot pass by hitting the totals with broken clustering the way 0.40 does.
+For contrast, before any of this work the same clips reported 11, 14 and 13 people with 40,
+47 and 43 appearances.
+
+`PipelineGroundTruthTest` asserts the person count exactly and allows one appearance of
+slack. Those tolerances record measured accuracy and exist to catch regressions. The test
+also asserts the appearance-count *distribution*, so a run cannot pass by hitting the totals
+with broken clustering the way a 0.40 merge threshold does.
+
+### Duplicate suppression, measured twice
+
+The first measurement, taken on the busiest frames, showed boxes on one face overlapping by
+**0.41 - 0.49** against **0.00 - 0.11** for boxes on different faces. A threshold of 0.30 sat
+comfortably in that gap and removed the obvious duplicates.
+
+A second, subtler population survived it. Some duplicate boxes overlap by only **0.245 - 0.290**,
+which is below 0.30, so they persisted and formed a *parallel track on a person already being
+tracked*. Those two tracks then coexist in time, and clustering bars temporally overlapping
+tracks from merging, so the duplicate became a permanent extra identity that no similarity
+threshold could remove. Diagnosis: the pair sat at cosine similarity 0.597, well above the
+0.50 merge threshold, and was refused solely by the temporal-exclusion rule.
+
+Overlap between concurrent tracks, split by whether they look like the same face:
+
+| clip | same face (residual duplicates) | different faces (real pairs) |
+|---|---|---|
+| sample_1 | n=9, 0.245 - 0.290 | n=20, 0.000 - 0.193 |
+| sample_2 | n=4, 0.254 - 0.271 | n=22, 0.000 - 0.198 |
+| sample_3 | none | n=17, 0.000 - 0.082 |
+
+Different faces never exceed **0.198**; residual duplicates never fall below **0.245**. The gap
+is narrower than the first one (0.047 wide against 0.30), so the value is a tighter call, but it
+is clean across 59 different-face pairs on three clips. `nmsIouThreshold` is set to **0.22**, the
+middle of that gap. Note the asymmetry of the risk: under-suppression adds a spurious identity,
+whereas over-suppression deletes a real person, so the value is kept above the different-face
+maximum rather than centred on convenience. `FaceSuppressionTest` pins both bands.
+
+This change is not specific to the clip with a known answer: Sample 2 carries the same duplicate
+population and Sample 3 carries none at all, so the fix cannot affect it.
+
+## Known defects
+
+**Sample 1: one tile shows two people.** One person in Sample 1 never appears alone, so their
+best available frame is a two-shot. The representative-frame scorer already penalises shared
+frames heavily (`sharedFramePenalty`), which fixed the other affected tile, but this frame is
+recorded as holding a *single* face: ML Kit did not detect the neighbour in that particular
+frame, even though a human sees them. Because nothing in the pipeline knows the second person
+is there, no face-count-based rule can act on it. Reducing the crop for such frames was tried
+and made no difference for exactly this reason, so it was removed rather than shipped as an
+inert branch. Samples 2 and 3 show five cleanly separated people each.
+
+
+**Sample 1 undercounts by one appearance.** One person's segments at 10.13-11.38s and
+11.75-13.00s are reported as a single 2.87s appearance. The gap between them is 370ms, just
+inside the tracker's own 375ms tolerance (`maxGapFrames` x `sampleIntervalMs`), so the tracker
+bridges a scene cut and never splits the track in the first place. This is not the clustering
+bug that was fixed in Phase 4; coalescing is already stricter than track-breaking.
+
+It is left unfixed deliberately. The only lever is `maxGapFrames`, and lowering it purely to
+correct this one segment on the one clip with a published answer is the kind of change that
+fits a sample rather than improves the pipeline. It is recorded here instead.
 
 ## Other tuned constants
 
 | constant | value | basis |
 |---|---|---|
-| `nmsIouThreshold` | 0.30 | ML Kit emits stacked boxes per face on downscaled frames. Measured overlap is 0.41 - 0.49 between boxes on one face and 0.00 - 0.11 between boxes on different faces, so any value in 0.2 - 0.35 separates them. Without this, counts roughly double. |
+| `nmsIouThreshold` | 0.22 | ML Kit emits stacked boxes per face on downscaled frames; without suppression the counts roughly double. Measured in two passes, see below. |
 | `minVisibleSegmentMs` | 500 ms | The brief counts an appearance as a continuous *visible* segment. Two- and three-frame flashes at scene cuts are not that. `minTrackDetections` is derived from this and the sampling interval rather than set independently. |
 | `appearanceCoalesceGapMs` | 250 ms | Must stay strictly below `maxGapFrames x sampleIntervalMs` (375 ms), otherwise clustering re-merges segments the tracker deliberately split. `PipelineConfig` rejects any configuration that violates this, so the two cannot drift apart. |
 | `sampleIntervalMs` | 125 ms (8 fps) | Fast enough to catch a ~1.4 s appearance many times over; ~240 frames for a 30 s clip. |

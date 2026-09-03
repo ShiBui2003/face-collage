@@ -58,6 +58,7 @@ fun face(
     timestampMs: Long = frame * SAMPLE_MS,
     frameWidth: Int = FRAME_W,
     frameHeight: Int = FRAME_H,
+    facesInFrame: Int = 1,
 ): DetectedFace = DetectedFace(
     frameIndex = frame,
     timestampMs = timestampMs,
@@ -74,4 +75,5 @@ fun face(
     ),
     frameWidth = frameWidth,
     frameHeight = frameHeight,
+    facesInFrame = facesInFrame,
 )

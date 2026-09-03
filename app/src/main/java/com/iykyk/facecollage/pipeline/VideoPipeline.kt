@@ -30,6 +30,7 @@ class VideoPipeline(
     private val tracker = Tracker(config)
     private val clusterer = IdentityClusterer(config)
     private val scorer = RepresentativeFrameScorer(config)
+    private val collageBuilder = CollageBuilder(config)
 
     /** Everything up to and including tracking. The expensive half: decode, detect, embed. */
     data class TrackedVideo(
@@ -80,9 +81,12 @@ class VideoPipeline(
                 )
             }
 
+            onProgress(working(ProcessingState.Stage.BUILDING, "Making your collage", null))
+            coroutineContext.ensureActive()
+
             CollageResult(
                 people = people,
-                collage = null,
+                collage = collageBuilder.build(people),
                 videoDurationMs = tracked.durationMs,
                 framesAnalysed = tracked.framesAnalysed,
                 facesDetected = tracked.facesDetected,
@@ -130,24 +134,28 @@ class VideoPipeline(
         detector: FaceDetectorStage,
         embedder: FaceEmbedder,
         frame: VideoFrame,
-    ): List<DetectedFace> = detector.detect(frame.bitmap).mapNotNull { candidate ->
-        // A modest margin for the model, unlike the generous crop used for the collage tile.
-        val cropBox = candidate.box.expand(config.embeddingCropExpansion, frame.bitmap.width, frame.bitmap.height)
-        val crop = frame.bitmap.cropTo(cropBox) ?: return@mapNotNull null
-        val embedding = try {
-            embedder.embed(crop)
-        } finally {
-            crop.recycle()
+    ): List<DetectedFace> = detector.detect(frame.bitmap).let { candidates ->
+        candidates.mapNotNull { candidate ->
+            // A modest margin for the model, unlike the generous crop used for the collage tile.
+            val cropBox =
+                candidate.box.expand(config.embeddingCropExpansion, frame.bitmap.width, frame.bitmap.height)
+            val crop = frame.bitmap.cropTo(cropBox) ?: return@mapNotNull null
+            val embedding = try {
+                embedder.embed(crop)
+            } finally {
+                crop.recycle()
+            }
+            DetectedFace(
+                frameIndex = frame.index,
+                timestampMs = frame.timestampMs,
+                box = candidate.box,
+                embedding = embedding,
+                attributes = candidate.attributes,
+                frameWidth = frame.bitmap.width,
+                frameHeight = frame.bitmap.height,
+                facesInFrame = candidates.size,
+            )
         }
-        DetectedFace(
-            frameIndex = frame.index,
-            timestampMs = frame.timestampMs,
-            box = candidate.box,
-            embedding = embedding,
-            attributes = candidate.attributes,
-            frameWidth = frame.bitmap.width,
-            frameHeight = frame.bitmap.height,
-        )
     }
 
     /**

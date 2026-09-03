@@ -37,7 +37,9 @@ class RepresentativeFrameScorer(private val config: PipelineConfig = PipelineCon
             config.weightSmile * face.attributes.smile +
             config.weightSize * size
 
-        return if (face.isFullyVisible) score else score * config.clippedFacePenalty
+        val clipping = if (face.isFullyVisible) 1f else config.clippedFacePenalty
+        val crowding = if (face.facesInFrame > 1) config.sharedFramePenalty else 1f
+        return score * clipping * crowding
     }
 
     private companion object {

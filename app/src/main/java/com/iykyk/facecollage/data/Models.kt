@@ -100,6 +100,11 @@ class DetectedFace(
     val attributes: FaceAttributes,
     val frameWidth: Int,
     val frameHeight: Int,
+    /**
+     * How many faces survived detection in this frame. A generously cropped tile taken from a
+     * split-screen or two-shot pulls in the neighbour, so a solo frame makes a better portrait.
+     */
+    val facesInFrame: Int = 1,
 ) {
     /** Face height as a fraction of frame height. Bigger faces make better collage tiles. */
     val relativeSize: Float get() = box.height / frameHeight.toFloat()

@@ -3,6 +3,7 @@ package com.iykyk.facecollage
 import com.iykyk.facecollage.data.BoxF
 import com.iykyk.facecollage.data.FaceAttributes
 import com.iykyk.facecollage.data.FaceCandidate
+import com.iykyk.facecollage.pipeline.PipelineConfig
 import com.iykyk.facecollage.pipeline.suppressOverlappingFaces
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -11,7 +12,8 @@ import org.junit.Test
 
 class FaceSuppressionTest {
 
-    private val threshold = 0.3f
+    // track the real configured value, so the shipped threshold is what these tests exercise
+    private val threshold = PipelineConfig().nmsIouThreshold
 
     private fun candidate(
         left: Float,
@@ -94,15 +96,42 @@ class FaceSuppressionTest {
         assertEquals(emptyList<FaceCandidate>(), suppressOverlappingFaces(emptyList(), FRAME_H, threshold))
     }
 
+    /**
+     * Measured across all three clips: boxes on DIFFERENT faces never overlapped by more than
+     * 0.198. This fixture sits in that band and must survive, because over-suppression deletes
+     * a real person, which is a worse failure than keeping a spurious one.
+     */
     @Test
-    fun `boxes overlapping just under the threshold are both kept`() {
-        // IoU deliberately below 0.3: adjacent faces that merely touch must not be merged
+    fun `overlap in the different-face band keeps both boxes`() {
         val a = candidate(0f, 0f, 300f, 400f)
-        val b = candidate(180f, 0f, 480f, 400f)
+        val b = candidate(210f, 0f, 510f, 400f)
 
         val iou = a.box.intersectionOverUnion(b.box)
-        assertTrue("fixture IoU was $iou, expected below threshold", iou < threshold)
+        assertTrue("fixture IoU was $iou, expected inside the different-face band", iou <= 0.198f)
+        assertTrue("fixture IoU was $iou, expected below threshold $threshold", iou < threshold)
         assertEquals(2, suppressOverlappingFaces(listOf(a, b), FRAME_H, threshold).size)
+    }
+
+    /**
+     * The subtle duplicates that survived a 0.30 threshold overlapped by 0.245-0.290. Each one
+     * formed a parallel track on a person already being tracked, and temporal exclusion then
+     * made that duplicate identity permanent. This fixture sits in that band and must collapse.
+     */
+    @Test
+    fun `overlap in the residual duplicate band is suppressed`() {
+        val a = candidate(0f, 0f, 300f, 400f, sharpness = 3000f)
+        val b = candidate(180f, 0f, 480f, 400f, sharpness = 500f)
+
+        val iou = a.box.intersectionOverUnion(b.box)
+        assertTrue("fixture IoU was $iou, expected inside the residual duplicate band", iou >= 0.245f)
+        assertEquals(1, suppressOverlappingFaces(listOf(a, b), FRAME_H, threshold).size)
+    }
+
+    @Test
+    fun `the configured threshold sits inside the measured gap`() {
+        // different faces never exceeded 0.198; residual duplicates never fell below 0.245
+        assertTrue("threshold $threshold must exceed the different-face maximum", threshold > 0.198f)
+        assertTrue("threshold $threshold must fall below the duplicate minimum", threshold < 0.245f)
     }
 
     private companion object {

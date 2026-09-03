@@ -24,11 +24,16 @@ data class PipelineConfig(
     /** Beyond this yaw the embedding is unreliable. */
     val maxUsableYaw: Float = 50f,
     /**
-     * Two boxes overlapping by more than this are the same face, so only the better one is
-     * kept. Measured on the sample clips: boxes on one face overlap by 0.41-0.49, boxes on
-     * different faces by 0.00-0.11, so anything in 0.2-0.35 separates them cleanly.
+     * Two boxes overlapping by more than this are the same face, so only the better one is kept.
+     *
+     * Measured twice. The obvious duplicates on crowded frames overlap by 0.41-0.49 against
+     * 0.00-0.11 for boxes on different faces. A second, subtler population survived at 0.30:
+     * duplicates that overlap by only 0.245-0.290, which then formed a parallel track on the
+     * same person and could never be merged away, because two tracks overlapping in time are
+     * barred from joining. Across all three clips boxes on different faces never exceeded
+     * 0.198, so 0.22 sits in the gap and removes that second population too.
      */
-    val nmsIouThreshold: Float = 0.3f,
+    val nmsIouThreshold: Float = 0.22f,
 
     // ---- tracking (frame to frame) ----
     val trackEmbeddingWeight: Float = 0.60f,
@@ -74,6 +79,12 @@ data class PipelineConfig(
     val weightSize: Float = 0.10f,
     /** Multiplier applied when the face touches the frame edge (clipped). */
     val clippedFacePenalty: Float = 0.5f,
+    /**
+     * Multiplier applied when the source frame held more than one face. A generous crop around
+     * one person in a two-shot drags in the other, which then appears in someone else's tile as
+     * well; a solo frame is strongly preferred where the person has one available.
+     */
+    val sharedFramePenalty: Float = 0.45f,
 
     /**
      * Margin around the face box fed to the embedding model. Modest on purpose: the model

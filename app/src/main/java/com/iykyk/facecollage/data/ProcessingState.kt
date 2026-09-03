@@ -36,8 +36,8 @@ data class PersonResult(
 
 data class CollageResult(
     val people: List<PersonResult>,
-    /** Null until CollageBuilder runs; the results grid renders from [people] either way. */
-    val collage: Bitmap?,
+    /** The shareable collage, one tile per person. */
+    val collage: Bitmap,
     val videoDurationMs: Long,
     val framesAnalysed: Int,
     val facesDetected: Int,
