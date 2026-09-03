@@ -8,7 +8,7 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.iykyk.facecollage.data.BoxF
 import com.iykyk.facecollage.data.FaceAttributes
 import com.iykyk.facecollage.data.FaceCandidate
-import kotlinx.coroutines.tasks.await
+import com.google.android.gms.tasks.Tasks
 import java.io.Closeable
 import kotlin.math.abs
 
@@ -31,9 +31,13 @@ class FaceDetectorStage(private val config: PipelineConfig = PipelineConfig()) :
             .build()
     )
 
-    /** Detections that passed the visibility gate, in the frame's own pixel coordinates. */
-    suspend fun detect(bitmap: Bitmap): List<FaceCandidate> {
-        val faces = detector.process(InputImage.fromBitmap(bitmap, 0)).await()
+    /**
+     * Detections that passed the visibility gate, in the frame's own pixel coordinates.
+     * Blocking: the whole pipeline is sequential and already runs off the main thread,
+     * so a suspend seam here would only add ceremony. Never call this on the main thread.
+     */
+    fun detect(bitmap: Bitmap): List<FaceCandidate> {
+        val faces = Tasks.await(detector.process(InputImage.fromBitmap(bitmap, 0)))
         return faces.mapNotNull { face -> toCandidate(face, bitmap) }
     }
 

@@ -58,7 +58,7 @@ dependencies {
 
     implementation(libs.mlkit.face.detection)
     implementation(libs.tensorflow.lite)
-    implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
 

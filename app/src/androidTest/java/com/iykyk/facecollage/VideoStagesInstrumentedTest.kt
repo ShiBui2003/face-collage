@@ -5,7 +5,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.iykyk.facecollage.pipeline.FaceDetectorStage
 import com.iykyk.facecollage.pipeline.FrameExtractor
 import com.iykyk.facecollage.pipeline.PipelineConfig
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,7 +42,7 @@ class VideoStagesInstrumentedTest {
     }
 
     @Test
-    fun mlKitFindsFacesThatSurviveTheVisibilityGate() = runBlocking {
+    fun mlKitFindsFacesThatSurviveTheVisibilityGate() {
         val detector = FaceDetectorStage(config)
         try {
             for (sample in SampleVideos.all()) {
@@ -52,7 +51,7 @@ class VideoStagesInstrumentedTest {
                 var maxInOneFrame = 0
 
                 extractor.forEachSampledFrame(context, sample.uri) { frame ->
-                    val faces = runBlocking { detector.detect(frame.bitmap) }
+                    val faces = detector.detect(frame.bitmap)
                     if (faces.isNotEmpty()) framesWithFaces++
                     totalFaces += faces.size
                     if (faces.size > maxInOneFrame) maxInOneFrame = faces.size
