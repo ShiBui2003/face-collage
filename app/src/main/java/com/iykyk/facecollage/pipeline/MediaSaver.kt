@@ -1,5 +1,6 @@
 package com.iykyk.facecollage.pipeline
 
+import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -51,6 +52,9 @@ object MediaSaver {
         return Intent(Intent.ACTION_SEND).apply {
             type = MIME
             putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TITLE, "Face Collage")
+            // The chooser renders its image preview from clipData, not from EXTRA_STREAM.
+            clipData = ClipData.newUri(context.contentResolver, "Face Collage", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }

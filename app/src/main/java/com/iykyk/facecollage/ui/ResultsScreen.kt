@@ -3,7 +3,6 @@ package com.iykyk.facecollage.ui
 import android.Manifest
 import android.content.Intent
 import android.os.Build
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -29,6 +28,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,15 +56,18 @@ fun ResultsScreen(
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
+    // Shown inline rather than as a toast: a toast vanishes in two seconds and leaves no
+    // evidence the save worked, on screen or in a screen recording.
+    var saveStatus by remember { mutableStateOf<String?>(null) }
+
     fun save() {
         scope.launch {
-            val message = try {
+            saveStatus = try {
                 withContext(Dispatchers.IO) { MediaSaver.saveToGallery(context, result.collage) }
                 "Saved to your gallery"
             } catch (e: Throwable) {
                 e.message ?: "Could not save that"
             }
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -69,7 +75,7 @@ fun ResultsScreen(
     val storagePermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) save() else Toast.makeText(context, "Need permission to save", Toast.LENGTH_SHORT).show()
+        if (granted) save() else saveStatus = "Storage permission is needed to save"
     }
 
     fun onSaveClicked() {
@@ -137,6 +143,18 @@ fun ResultsScreen(
                         content = MaterialTheme.colorScheme.onSecondary,
                         modifier = Modifier.weight(1f),
                         onClick = ::onShareClicked,
+                    )
+                }
+
+                saveStatus?.let { status ->
+                    Text(
+                        text = status,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp)
+                            .semantics { contentDescription = status },
                     )
                 }
 

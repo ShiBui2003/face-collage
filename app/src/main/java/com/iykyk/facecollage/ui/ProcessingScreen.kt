@@ -60,7 +60,8 @@ fun ProcessingScreen(state: ProcessingState.Working, onCancel: () -> Unit) {
                     .clip(RoundedCornerShape(10.dp))
                     .semantics { contentDescription = "Processing progress" },
                 color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surface,
+                // a tinted track: plain surface is white on a cream background and vanishes
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
             )
         } else {
             LinearProgressIndicator(
@@ -70,7 +71,8 @@ fun ProcessingScreen(state: ProcessingState.Working, onCancel: () -> Unit) {
                     .clip(RoundedCornerShape(10.dp))
                     .semantics { contentDescription = "Processing" },
                 color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surface,
+                // a tinted track: plain surface is white on a cream background and vanishes
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
             )
         }
 
